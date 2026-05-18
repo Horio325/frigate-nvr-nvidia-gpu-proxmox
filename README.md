@@ -1,4 +1,4 @@
-# Frigate CCTV — Proxmox LXC (Debian 12) + Docker + NVIDIA GPU
+# Frigate NVR — Using Proxmox LXC (Debian 12) + Docker + NVIDIA GPU
 
 A summary guide on how I set up Frigate NVR on Proxmox with Docker, NVIDIA GPU acceleration, multi-camera support, Zabbix monitoring (optional), and automated backups.
 
