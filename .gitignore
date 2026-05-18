@@ -1,0 +1,8 @@
+frigate.db
+*.db
+backups/
+*.log
+.env
+*.env
+.DS_Store
+Thumbs.db
