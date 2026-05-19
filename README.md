@@ -518,7 +518,7 @@ This is a summary of the problems I faced while configuring the Frigate NVR.
 ---
 
 ## Zabbix Monitoring Integration
-This section is not necessary because I experimented with Zabbix to monitor the network, CPU, and memory usage of Frigate NVR.
+I experimented using Zabbix to monitor the network, CPU, and memory usage of Frigate NVR.
 
 | Container | CT ID | Role | IP |
 |-----------|-------|------|----|
