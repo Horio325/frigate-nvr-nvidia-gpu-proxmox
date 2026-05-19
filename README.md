@@ -85,38 +85,7 @@ cctv-records:100/vm-100-disk-1.raw,mp=/media/records,backup=1,size=1000G
 
 ### docker/docker-compose.yml
 
-```yaml
-services:
-  frigate:
-    container_name: frigate-cctv
-    restart: unless-stopped
-    stop_grace_period: 30s
-    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt 
-    runtime: nvidia
-    shm_size: "1024mb"
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - TZ=Asia/Manila
-    devices:
-      - /dev/nvidia0:/dev/nvidia0
-      - /dev/nvidiactl:/dev/nvidiactl
-      - /dev/nvidia-uvm:/dev/nvidia-uvm
-    volumes:
-      - ./config:/config
-      - /media/records:/media/frigate
-      - ./frigate.db:/config/frigate.db
-      - /etc/localtime:/etc/localtime:ro      #  ^f^p sync with host time
-      - /etc/timezone:/etc/timezone:ro        #  ^f^p sync with host timezone
-      - type: tmpfs # 1GB In-memory filesystem for recording segment storage
-        target: /tmp/cache
-        tmpfs:
-          size: 3000000000
-    ports:
-      - "8971:5000"
-      - "8554:8554" # RTSP feeds
-
-```
+https://github.com/Horio325/frigate-nvr-nvidia-gpu-proxmox/blob/main/docker/docker-compose.yml
 
 ### Volume Mapping Summary
 
@@ -145,118 +114,7 @@ services:
 
 ### config/config.yml
 
-```yaml
-mqtt:
-  enabled: false
-
-detectors:
-  onnx:
-    type: onnx         # NVIDIA GPU auto-detected in tensorrt image
-    device: cuda
-
-model:
-  model_type: yolo-generic
-  width: 320
-  height: 320
-  input_tensor: nchw
-  input_dtype: float
-  path: /config/model_cache/yolov9-t-320.onnx
-  labelmap_path: /labelmap/coco-80.txt
-
-
-ffmpeg:
-  hwaccel_args: preset-nvidia-h265
-
-record:
-  enabled: true
-  continuous:
-    days: 30
-  detections:
-    pre_capture: 30        # seconds before detection to include
-    post_capture: 30       # seconds after detection to include
-    retain:
-      days: 30
-      mode: motion
-  alerts:
-    pre_capture: 10
-    post_capture: 10
-    retain:
-      days: 30
-      mode: motion
-
-cameras:
-  entrance:
-    enabled: true
-    ffmpeg:
-      input_args: preset-rtsp-restream
-      output_args:
-        record: preset-record-generic-audio-aac
-      inputs:
-        - path: rtsp://127.0.0.1:8554/entrance_1
-          roles:
-            - record
-        - path: rtsp://127.0.0.1:8554/entrance_2
-          roles:
-            - detect
-    snapshots:
-      enabled: true
-    detect:
-      enabled: true
-      width: 1920
-      height: 1080
-      fps: 5
-    record:
-      enabled: true
-      continuous:
-        days: 14     # per-camera override
-    live:
-      streams:
-        Stream 1: entrance_1
-        Stream 2: entrance_2
-
-  perimeter_1:
-    enabled: true
-    ffmpeg:
-      input_args: preset-rtsp-restream
-      hwaccel_args: preset-nvidia-h265
-      inputs:
-        - path: rtsp://127.0.0.1:8554/perimeter_1_main
-          roles:
-            - record
-        - path: rtsp://127.0.0.1:8554/perimeter_1_sub
-          roles:
-            - detect
-      output_args:
-        record: preset-record-generic-audio-aac
-    detect:
-      enabled: true
-      width: 1920      # adjust to your camera resolution
-      height: 1080
-      fps: 5           # ← start LOW (5fps) for detect stream
-    record:
-      enabled: true
-      continuous:
-        days: 14
-    live:
-      streams:
-        Stream 1: perimeter_1_main
-        Stream 2: perimeter_1_sub
-    objects:
-      mask: 0.46,0,0.994,1,0.994,0
-version: 0.17-0
-go2rtc:
-  streams:
-    entrance_1:
-      - rtsp://admin:PASSWORD@[CAMERA-1 IP ADDRESS]/media/video1
-    entrance_2:
-      - rtsp://admin:PASSWORD@[CAMERA-1 IP ADDRESS]/media/video2
-    perimeter_1_main:
-      - "rtsp://admin:PASSWORD@[CAMERA-2 IP ADDRESS]/media/video1#video=copy#audio=aac"  # ← transcode audio to AAC
-    perimeter_1_sub:
-      - "rtsp://admin:PASSWORD@[CAMERA-2 IP ADDRESS]/media/video2#video=copy#audio=disable"  # ← disable audio on detect
-  rtsp:
-    listen: ":8554"
-```
+https://github.com/Horio325/frigate-nvr-nvidia-gpu-proxmox/blob/main/config/config.yml
 
 ### Key Configuration Notes
 
