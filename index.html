@@ -3,17 +3,1631 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="nEPzjtt66hD6RL8efkzOaOvBO5q65fNdQXvnU7IidhU" />
-  <title>Frigate CCTV — Proxmox LXC + Docker + NVIDIA GPU</title>
-  <!-- Google Search Console verification tag will go here in Part 4 -->
+  <meta name="description" content="Complete guide for setting up Frigate NVR on Proxmox LXC with Docker and NVIDIA GPU acceleration.">
+  <title>Frigate NVR — Proxmox Setup Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0a0c10;
+      --bg2:       #0f1218;
+      --bg3:       #151a22;
+      --bg4:       #1c2330;
+      --border:    #243040;
+      --border2:   #2e3f55;
+      --text:      #dde6f0;
+      --text2:     #96aec8;
+      --text3:     #607080;
+      --accent:    #00d4ff;
+      --accent2:   #0099cc;
+      --green:     #00e676;
+      --yellow:    #ffd740;
+      --red:       #ff5252;
+      --orange:    #ff9100;
+      --purple:    #b388ff;
+      --code-bg:   #080b0f;
+      --code-text: #92dfd0;
+      --radius:    8px;
+      --radius2:   12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      line-height: 1.8;
+      font-size: 15.5px;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── LAYOUT ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow-y: auto;
+      padding: 0 0 40px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-brand {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      margin-bottom: 6px;
+    }
+
+    .sidebar-logo .icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-logo span {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    .sidebar-meta {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-meta span {
+      color: var(--accent);
+    }
+
+    .nav-group {
+      padding: 0 12px 4px;
+    }
+
+    .nav-group-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text3);
+      padding: 14px 12px 6px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: var(--text2);
+      font-size: 13.5px;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .nav-link:hover {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .nav-link.active {
+      background: rgba(0, 212, 255, 0.1);
+      color: var(--accent);
+      border-left: 2px solid var(--accent);
+    }
+
+    .nav-link .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text3);
+      min-width: 20px;
+    }
+
+    .nav-link .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text3);
+      flex-shrink: 0;
+      margin-left: 2px;
+    }
+
+    /* ── MAIN CONTENT ── */
+    .main {
+      flex: 1;
+      min-width: 0;
+      max-width: 960px;
+      padding: 60px 72px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      margin-bottom: 72px;
+      padding-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      color: var(--accent);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero h1 {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 700;
+      font-size: 42px;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span {
+      color: var(--accent);
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      color: var(--text2);
+      max-width: 580px;
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .hero-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 5px 10px;
+      border-radius: var(--radius);
+    }
+
+    .tag.green { border-color: rgba(0,230,118,0.3); color: var(--green); background: rgba(0,230,118,0.05); }
+    .tag.blue { border-color: rgba(0,212,255,0.3); color: var(--accent); background: rgba(0,212,255,0.05); }
+    .tag.purple { border-color: rgba(179,136,255,0.3); color: var(--purple); background: rgba(179,136,255,0.05); }
+    .tag.yellow { border-color: rgba(255,215,64,0.3); color: var(--yellow); background: rgba(255,215,64,0.05); }
+    .tag.orange { border-color: rgba(255,145,0,0.3); color: var(--orange); background: rgba(255,145,0,0.05); }
+
+    /* ── SECTIONS ── */
+    .section {
+      margin-bottom: 72px;
+      scroll-margin-top: 32px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .section-header h2 {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    h3 {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--accent);
+      margin: 32px 0 14px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    p {
+      color: var(--text);
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    /* ── CALLOUTS ── */
+    .callout {
+      display: flex;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      margin: 20px 0;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .callout-icon { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+    .callout-text { color: var(--text); word-break: break-word; overflow-wrap: break-word; min-width: 0; flex: 1; }
+    .callout-text strong { font-weight: 600; }
+    .callout-text strong.label { display: block; margin-bottom: 6px; }
+    .callout-text strong.inline { display: inline; margin-right: 4px; }
+
+    .callout.warn {
+      background: rgba(255,215,64,0.06);
+      border-left: 3px solid var(--yellow);
+      border-top: 1px solid rgba(255,215,64,0.15);
+      border-bottom: 1px solid rgba(255,215,64,0.15);
+      border-right: 1px solid rgba(255,215,64,0.15);
+    }
+    .callout.warn .callout-text { color: rgba(255,215,64,0.95); }
+
+    .callout.info {
+      background: rgba(0,212,255,0.06);
+      border-left: 3px solid var(--accent);
+      border-top: 1px solid rgba(0,212,255,0.15);
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      border-right: 1px solid rgba(0,212,255,0.15);
+    }
+    .callout.info .callout-text { color: rgba(0,212,255,0.95); }
+
+    .callout.success {
+      background: rgba(0,230,118,0.06);
+      border-left: 3px solid var(--green);
+      border-top: 1px solid rgba(0,230,118,0.15);
+      border-bottom: 1px solid rgba(0,230,118,0.15);
+      border-right: 1px solid rgba(0,230,118,0.15);
+    }
+    .callout.success .callout-text { color: rgba(0,230,118,0.95); }
+
+    /* ── CODE BLOCKS ── */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      margin: 16px 0;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-lang {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text3);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text3);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .code-block pre {
+      padding: 20px 24px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--code-text);
+    }
+
+    .code-block pre .comment { color: var(--text3); }
+    .code-block pre .key { color: #79b8ff; }
+    .code-block pre .val { color: #9ecbff; }
+    .code-block pre .str { color: #85e89d; }
+    .code-block pre .num { color: var(--orange); }
+    .code-block pre .flag { color: var(--yellow); }
+    .code-block pre .cmd { color: var(--accent); }
+    .code-block pre .path { color: var(--purple); }
+
+    /* ── INLINE CODE ── */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 2px 7px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+
+    /* ── TABLES ── */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: var(--radius2);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead th {
+      background: var(--bg3);
+      color: var(--text2);
+      font-weight: 600;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 11.5px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 13px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+    tbody td {
+      padding: 13px 18px;
+      color: var(--text);
+      vertical-align: top;
+      line-height: 1.6;
+    }
+
+    tbody td:first-child {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    /* ── STEP LIST ── */
+    .steps { list-style: none; padding: 0; margin: 16px 0; }
+
+    .steps li {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 16px;
+      padding: 16px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-content { flex: 1; font-size: 14.5px; }
+    .step-content strong { color: #fff; font-weight: 600; display: block; margin-bottom: 5px; }
+
+    /* ── CHECKLIST ── */
+    .checklist { list-style: none; padding: 0; margin: 12px 0; }
+
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 14.5px;
+      color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .checklist li:last-child { border-bottom: none; }
+
+    .checklist li::before {
+      content: '○';
+      color: var(--text3);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── GRID CARDS ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      padding: 18px;
+      transition: border-color 0.15s;
+    }
+
+    .card:hover { border-color: var(--border2); }
+
+    .card-title {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .card-desc { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+    .card-tag { margin-top: 10px; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, var(--border), transparent);
+      margin: 48px 0;
+    }
+
+    /* ── BADGE STATUS ── */
+    .status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.yellow { background: var(--yellow); }
+    .status-dot.red { background: var(--red); }
+
+    /* ── INLINE HIGHLIGHT ── */
+    .hl { color: #fff; font-weight: 500; }
+    .hl-green { color: var(--green); }
+    .hl-yellow { color: var(--yellow); }
+    .hl-red { color: var(--red); }
+    .hl-blue { color: var(--accent); }
+    .hl-purple { color: var(--purple); }
+    .hl-orange { color: var(--orange); }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 80px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: gap;
+      gap: 12px;
+    }
+
+    .footer-left { font-size: 12px; color: var(--text3); }
+    .footer-left span { color: var(--text2); }
+
+    .footer-right {
+      display: flex;
+      gap: 12px;
+    }
+
+    .footer-link {
+      font-size: 12px;
+      color: var(--text3);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      transition: color 0.15s;
+    }
+
+    .footer-link:hover { color: var(--accent); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { padding: 32px 28px; }
+      .hero h1 { font-size: 30px; }
+    }
+
+    /* ── ANIMATIONS ── */
+    .section { animation: fadeUp 0.4s ease both; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Stagger section animations */
+    .section:nth-child(1) { animation-delay: 0.05s; }
+    .section:nth-child(2) { animation-delay: 0.10s; }
+    .section:nth-child(3) { animation-delay: 0.15s; }
+    .section:nth-child(4) { animation-delay: 0.20s; }
+    .section:nth-child(5) { animation-delay: 0.25s; }
+
+    /* ── PROGRESS BAR ── */
+    #progress {
+      position: fixed;
+      top: 0; left: 0;
+      height: 2px;
+      background: linear-gradient(to right, var(--accent2), var(--accent));
+      width: 0%;
+      transition: width 0.1s;
+      z-index: 999;
+    }
+  </style>
 </head>
 <body>
-  <h1>Frigate CCTV Setup Documentation</h1>
-  <p>Complete guide for setting up Frigate NVR on Proxmox with Docker and NVIDIA GPU.</p>
-  <p>
-    <a href="https://github.com/Horio325/frigate-nvr-nvidia-gpu-proxmox">
-      View on GitHub
-    </a>
-  </p>
+
+<div id="progress"></div>
+
+<div class="layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <a class="sidebar-logo" href="#hero">
+        <div class="icon">🎥</div>
+        <span>Frigate NVR</span>
+      </a>
+      <div class="sidebar-meta">v1.0 &nbsp;·&nbsp; <span>Proxmox LXC</span></div>
+    </div>
+
+    <div class="nav-group-label">Getting Started</div>
+    <div class="nav-group">
+      <a class="nav-link active" href="#overview"><span class="num">01</span> System Overview</a>
+      <a class="nav-link" href="#directory"><span class="num">02</span> Directory Structure</a>
+      <a class="nav-link" href="#storage"><span class="num">03</span> Storage Configuration</a>
+      <a class="nav-link" href="#config"><span class="num">04</span> Frigate Configuration</a>
+      <a class="nav-link" href="#persistence"><span class="num">05</span> Data Persistence</a>
+    </div>
+
+    <div class="nav-group-label">GPU & Detection</div>
+    <div class="nav-group">
+      <a class="nav-link" href="#nvidia"><span class="num">06</span> NVIDIA GPU Setup</a>
+      <a class="nav-link" href="#onnx"><span class="num">07</span> ONNX Detector</a>
+      <a class="nav-link" href="#maintenance"><span class="num">08</span> Driver Maintenance</a>
+      <a class="nav-link" href="#verification"><span class="num">09</span> GPU Verification</a>
+      <a class="nav-link" href="#shm"><span class="num">10</span> Shared Memory</a>
+    </div>
+
+    <div class="nav-group-label">Multi-Camera</div>
+    <div class="nav-group">
+      <a class="nav-link" href="#cameras"><span class="num">11</span> Adding Cameras</a>
+    </div>
+
+    <div class="nav-group-label">System</div>
+    <div class="nav-group">
+      <a class="nav-link" href="#troubleshooting"><span class="num">12</span> Troubleshooting</a>
+      <a class="nav-link" href="#storage-est"><span class="num">13</span> Storage Estimation</a>
+      <a class="nav-link" href="#zabbix"><span class="num">14</span> Zabbix Monitoring <span style="font-size:10px;color:var(--text3)">(optional)</span></a>
+      <a class="nav-link" href="#timezone"><span class="num">15</span> Timezone</a>
+      <a class="nav-link" href="#backup"><span class="num">16</span> Backup Procedures</a>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- HERO -->
+    <div class="hero" id="hero">
+      <div class="hero-badge">documentation v1.0</div>
+      <h1>Frigate NVR<br><span>Proxmox Setup Guide</span></h1>
+      <p class="hero-desc">A summary guide on how I set up Frigate NVR on Proxmox with Docker, NVIDIA GPU acceleration, multi-camera support, Zabbix monitoring (optional), and automated backups.</p>
+      <div class="hero-tags">
+        <span class="tag blue">Proxmox VE 8.3.0</span>
+        <span class="tag green">Frigate 0.17.1</span>
+        <span class="tag purple">NVIDIA GTX 1050 Ti</span>
+        <span class="tag yellow">Driver 580.142</span>
+        <span class="tag orange">2× H.265 Cameras</span>
+        <span class="tag blue">1TB Storage</span>
+      </div>
+    </div>
+
+    <!-- 1. SYSTEM OVERVIEW -->
+    <section class="section" id="overview">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <h2>System Overview</h2>
+      </div>
+      <p>Frigate is an open-source Network Video Recorder (NVR) that uses AI to detect people, vehicles, and other objects in your camera feeds. It runs inside a lightweight Linux container (LXC) on Proxmox, managed by Docker. You do not need prior Linux experience — each step is explained in full with exact commands to run.</p>
+
+      <h3>Hardware &amp; Software Stack</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Details</th></tr></thead>
+          <tbody>
+            <tr><td>Hypervisor</td><td>Proxmox VE 8.3.0</td></tr>
+            <tr><td>Container</td><td>LXC CT-100 (frigate-cctv) on node 'horios'</td></tr>
+            <tr><td>NVR Software</td><td>Frigate 0.17.1</td></tr>
+            <tr><td>Deployment</td><td>Docker inside LXC</td></tr>
+            <tr><td>GPU</td><td>NVIDIA GeForce GTX 1050 Ti</td></tr>
+            <tr><td>GPU Driver</td><td>580.142 (Linux) — max for Pascal architecture</td></tr>
+            <tr><td>Primary Storage</td><td>20GB root disk</td></tr>
+            <tr><td>Recording Storage</td><td>1TB (1000GB) loop1 at <code>/media/records</code></td></tr>
+            <tr><td>Camera 1</td><td>entrance — 192.168.0.249 — H.265/HEVC, 1920×1080, no audio</td></tr>
+            <tr><td>Camera 2</td><td>perimeter_1 — 192.168.0.250 — H.265/HEVC, 1920×1080, PCMU/8000 audio</td></tr>
+            <tr><td>Monitoring</td><td>Zabbix — CT-102 <em style="color:var(--text3);font-size:12px;">(optional, tested)</em></td></tr>
+            <tr><td>OS (Proxmox)</td><td>Debian Bookworm</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2. DIRECTORY STRUCTURE -->
+    <section class="section" id="directory">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <h2>Directory Structure</h2>
+      </div>
+      <p>All Frigate files live under <code>/root/</code> inside LXC CT-100. Understanding this structure helps you know where to edit configs, where recordings are stored, and what to back up.</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">filesystem</span></div>
+        <pre>/root/
+├── docker-compose.yml       <span class="comment"># Docker configuration</span>
+├── frigate.db               <span class="comment"># Persistent database (alerts/detections)</span>
+├── config/
+│   └── config.yml           <span class="comment"># Frigate configuration</span>
+└── media/
+    └── records/             <span class="comment"># Loop1 1TB recording storage</span>
+        ├── recordings/      <span class="comment"># Continuous recording segments</span>
+        ├── clips/           <span class="comment"># Event clips and thumbnails</span>
+        └── exports/         <span class="comment"># Exported footage</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text"><strong class="label">Important</strong> <code>frigate.db</code> must exist as a <strong>file</strong> before starting the container. Run <code>touch ~/frigate.db</code> to create it. If Docker creates it as a directory first, you'll get a mount error.</div>
+      </div>
+    </section>
+
+    <!-- 3. STORAGE -->
+    <section class="section" id="storage">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <h2>Storage Configuration</h2>
+      </div>
+      <p>Frigate needs two types of storage: a small root disk for the OS and configs, and a large disk for recording footage. This setup uses Proxmox loop devices (virtual disks) for both.</p>
+
+      <h3>Proxmox Mount Points</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Device</th><th>Size</th><th>Mount Point</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>loop0</td><td>20GB</td><td><code>/</code></td><td>Root filesystem</td></tr>
+            <tr><td>loop1</td><td>1TB</td><td><code>/media/records</code></td><td>Recording storage</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">proxmox config</span></div>
+        <pre>cctv-records:100/vm-100-disk-1.raw,mp=/media/records,backup=1,size=1000G</pre>
+      </div>
+
+      <h3>docker/docker-compose.yml</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">yaml</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="key">services:</span>
+  <span class="key">frigate:</span>
+    <span class="key">container_name:</span> <span class="str">frigate-cctv</span>
+    <span class="key">restart:</span> <span class="str">unless-stopped</span>
+    <span class="key">stop_grace_period:</span> <span class="str">30s</span>
+    <span class="key">image:</span> <span class="str">ghcr.io/blakeblackshear/frigate:stable-tensorrt</span>
+    <span class="key">runtime:</span> <span class="str">nvidia</span>
+    <span class="key">shm_size:</span> <span class="str">"1024mb"</span>            <span class="comment"># 1GB shared memory for 2+ cameras</span>
+    <span class="key">environment:</span>
+      <span class="flag">- NVIDIA_VISIBLE_DEVICES=all</span>
+      <span class="flag">- NVIDIA_DRIVER_CAPABILITIES=all</span>
+      <span class="flag">- TZ=Asia/Manila</span>              <span class="comment"># timezone</span>
+    <span class="key">devices:</span>
+      <span class="flag">- /dev/nvidia0:/dev/nvidia0</span>
+      <span class="flag">- /dev/nvidiactl:/dev/nvidiactl</span>
+      <span class="flag">- /dev/nvidia-uvm:/dev/nvidia-uvm</span>
+    <span class="key">volumes:</span>
+      <span class="flag">- ./config:/config</span>                    <span class="comment"># config persistence</span>
+      <span class="flag">- /media/records:/media/frigate</span>        <span class="comment"># 1TB recording storage</span>
+      <span class="flag">- ./frigate.db:/config/frigate.db</span>     <span class="comment"># database persistence</span>
+      <span class="flag">- /etc/localtime:/etc/localtime:ro</span>    <span class="comment"># sync timezone</span>
+      <span class="flag">- /etc/timezone:/etc/timezone:ro</span>      <span class="comment"># sync timezone name</span>
+      <span class="flag">- type: tmpfs</span>
+        <span class="key">target:</span> <span class="str">/tmp/cache</span>
+        <span class="key">tmpfs:</span>
+          <span class="key">size:</span> <span class="num">2000000000</span>               <span class="comment"># 2GB in-memory segment cache</span>
+    <span class="key">ports:</span>
+      <span class="flag">- "8971:5000"</span>
+      <span class="flag">- "8554:8554"</span></pre>
+      </div>
+
+      <h3>Volume Mapping Summary</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Host Path</th><th>Container Path</th><th>Purpose</th><th>Persistent?</th></tr></thead>
+          <tbody>
+            <tr><td>./config</td><td>/config</td><td>Frigate config.yml</td><td><span class="hl-green">✓ Yes</span></td></tr>
+            <tr><td>/media/records</td><td>/media/frigate</td><td>1TB recordings &amp; clips</td><td><span class="hl-green">✓ Yes</span></td></tr>
+            <tr><td>./frigate.db</td><td>/config/frigate.db</td><td>Database</td><td><span class="hl-green">✓ Yes</span></td></tr>
+            <tr><td>/etc/localtime</td><td>/etc/localtime:ro</td><td>Host timezone sync</td><td><span class="hl-green">✓ Yes</span></td></tr>
+            <tr><td>tmpfs</td><td>/tmp/cache</td><td>Segment write cache (2GB)</td><td><span class="hl-red">✗ RAM only</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>SHM Size Reference</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Resolution</th><th>Cameras</th><th>Recommended SHM</th></tr></thead>
+          <tbody>
+            <tr><td>1080p</td><td>1</td><td>128MB</td></tr>
+            <tr><td>1080p</td><td>2 (current)</td><td><span class="hl-green">1024MB ✓</span></td></tr>
+            <tr><td>1080p</td><td>4+</td><td>2GB</td></tr>
+            <tr><td>4K</td><td>1-2</td><td>1GB</td></tr>
+            <tr><td>4K</td><td>3+</td><td>2GB</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. FRIGATE CONFIG -->
+    <section class="section" id="config">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <h2>Frigate Configuration</h2>
+      </div>
+      <p>The Frigate configuration file (<code>config/config.yml</code>) controls everything — cameras, recording, detection, and GPU usage. It uses YAML format where indentation matters. Always use spaces, not tabs.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">💡</span>
+        <div class="callout-text">After every edit to <code>config.yml</code>, restart Frigate with: <code>docker compose down && docker compose up -d</code></div>
+      </div>
+
+      <h3>config/config.yml — Full Configuration</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">yaml</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="key">mqtt:</span>
+  <span class="key">enabled:</span> <span class="str">false</span>
+
+<span class="key">detectors:</span>
+  <span class="key">onnx:</span>
+    <span class="key">type:</span> <span class="str">onnx</span>
+    <span class="key">device:</span> <span class="str">cuda</span>        <span class="comment"># force CUDAExecutionProvider for GPU detection</span>
+
+<span class="key">model:</span>
+  <span class="key">model_type:</span> <span class="str">yolo-generic</span>
+  <span class="key">width:</span> <span class="num">320</span>
+  <span class="key">height:</span> <span class="num">320</span>
+  <span class="key">input_tensor:</span> <span class="str">nchw</span>
+  <span class="key">input_dtype:</span> <span class="str">float</span>
+  <span class="key">path:</span> <span class="str">/config/model_cache/yolov9-t-320.onnx</span>
+  <span class="key">labelmap_path:</span> <span class="str">/labelmap/coco-80.txt</span>
+
+<span class="key">ffmpeg:</span>
+  <span class="key">hwaccel_args:</span> <span class="str">preset-nvidia-h265</span>
+
+<span class="key">record:</span>
+  <span class="key">enabled:</span> <span class="str">true</span>
+  <span class="key">continuous:</span>
+    <span class="key">days:</span> <span class="num">30</span>
+  <span class="key">alerts:</span>
+    <span class="key">retain:</span>
+      <span class="key">days:</span> <span class="num">30</span>
+      <span class="key">mode:</span> <span class="str">motion</span>
+  <span class="key">detections:</span>
+    <span class="key">retain:</span>
+      <span class="key">days:</span> <span class="num">30</span>
+      <span class="key">mode:</span> <span class="str">motion</span>
+
+<span class="key">cameras:</span>
+  <span class="key">entrance:</span>
+    <span class="key">enabled:</span> <span class="str">true</span>
+    <span class="key">ffmpeg:</span>
+      <span class="key">input_args:</span> <span class="str">preset-rtsp-restream</span>
+      <span class="key">inputs:</span>
+        <span class="flag">- path: rtsp://127.0.0.1:8554/entrance_1</span>
+          <span class="key">roles:</span>
+            <span class="flag">- record</span>
+        <span class="flag">- path: rtsp://127.0.0.1:8554/entrance_2</span>
+          <span class="key">roles:</span>
+            <span class="flag">- detect</span>
+      <span class="key">output_args:</span>
+        <span class="key">record:</span> <span class="str">preset-record-generic-audio-aac</span>
+    <span class="key">detect:</span>
+      <span class="key">enabled:</span> <span class="str">true</span>
+      <span class="key">width:</span> <span class="num">1920</span>
+      <span class="key">height:</span> <span class="num">1080</span>
+      <span class="key">fps:</span> <span class="num">20</span>
+    <span class="key">record:</span>
+      <span class="key">enabled:</span> <span class="str">true</span>
+      <span class="key">continuous:</span>
+        <span class="key">days:</span> <span class="num">30</span>
+    <span class="key">live:</span>
+      <span class="key">streams:</span>
+        <span class="key">Stream 1:</span> <span class="str">entrance_1</span>
+        <span class="key">Stream 2:</span> <span class="str">entrance_2</span>
+
+  <span class="key">perimeter_1:</span>
+    <span class="key">enabled:</span> <span class="str">true</span>
+    <span class="key">ffmpeg:</span>
+      <span class="key">input_args:</span> <span class="str">preset-rtsp-restream</span>
+      <span class="key">hwaccel_args:</span> <span class="str">preset-nvidia-h265</span>
+      <span class="key">inputs:</span>
+        <span class="flag">- path: rtsp://127.0.0.1:8554/perimeter_1_main</span>
+          <span class="key">roles:</span>
+            <span class="flag">- record</span>
+        <span class="flag">- path: rtsp://127.0.0.1:8554/perimeter_1_sub</span>
+          <span class="key">roles:</span>
+            <span class="flag">- detect</span>
+      <span class="key">output_args:</span>
+        <span class="key">record:</span> <span class="str">preset-record-generic-audio-aac</span>
+    <span class="key">detect:</span>
+      <span class="key">enabled:</span> <span class="str">true</span>
+      <span class="key">width:</span> <span class="num">1920</span>
+      <span class="key">height:</span> <span class="num">1080</span>
+      <span class="key">fps:</span> <span class="num">5</span>                  <span class="comment"># start low for new cameras</span>
+    <span class="key">record:</span>
+      <span class="key">enabled:</span> <span class="str">true</span>
+      <span class="key">continuous:</span>
+        <span class="key">days:</span> <span class="num">30</span>
+    <span class="key">live:</span>
+      <span class="key">streams:</span>
+        <span class="key">Stream 1:</span> <span class="str">perimeter_1_main</span>
+        <span class="key">Stream 2:</span> <span class="str">perimeter_1_sub</span>
+
+<span class="key">version:</span> <span class="str">0.17-0</span>
+<span class="key">go2rtc:</span>
+  <span class="key">streams:</span>
+    <span class="key">entrance_1:</span>
+      <span class="flag">- rtsp://admin:YOUR_PASSWORD@192.168.0.249/media/video1</span>
+    <span class="key">entrance_2:</span>
+      <span class="flag">- rtsp://admin:YOUR_PASSWORD@192.168.0.249/media/video2</span>
+    <span class="key">perimeter_1_main:</span>
+      <span class="flag">- "rtsp://admin:YOUR_PASSWORD@192.168.0.250/media/video1#video=copy#audio=aac"</span>
+    <span class="key">perimeter_1_sub:</span>
+      <span class="flag">- "rtsp://admin:YOUR_PASSWORD@192.168.0.250/media/video2#video=copy#audio=disable"</span>
+  <span class="key">rtsp:</span>
+    <span class="key">listen:</span> <span class="str">":8554"</span>          <span class="comment"># colon required — prevents ffmpeg race condition</span></pre>
+      </div>
+
+      <h3>Key Configuration Notes</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>detectors.onnx.device</td><td><code>cuda</code></td><td>Forces GPU detection — without this ONNX uses CPU</td></tr>
+            <tr><td>hwaccel_args</td><td><code>preset-nvidia-h265</code></td><td>Both cameras use H.265/HEVC</td></tr>
+            <tr><td>input_args</td><td><code>preset-rtsp-restream</code></td><td>Routes through go2rtc, fixes codec errors</td></tr>
+            <tr><td>entrance detect fps</td><td><code>20</code></td><td>Stable for no-audio camera</td></tr>
+            <tr><td>perimeter_1 detect fps</td><td><code>5</code></td><td>Start low for new cameras</td></tr>
+            <tr><td>rtsp listen</td><td><code>":8554"</code></td><td>Colon required — binds RTSP on startup</td></tr>
+            <tr><td>perimeter_1_main audio</td><td><code>#audio=aac</code></td><td>Transcodes PCMU/8000 → AAC for MP4</td></tr>
+            <tr><td>perimeter_1_sub audio</td><td><code>#audio=disable</code></td><td>Detect stream needs no audio</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">If PCMU audio is not handled you'll get: <code>No new valid recording segments were created in the last 120s.</code><br>If the listen colon is missing: <code>listen tcp: address 8554: missing port in address</code></div>
+      </div>
+    </section>
+
+    <!-- 5. DATA PERSISTENCE -->
+    <section class="section" id="persistence">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <h2>Data Persistence</h2>
+      </div>
+      <p>By default, Docker containers are stateless — all data is lost when the container stops. To keep your recordings, camera settings, and detection history, critical files must be stored outside the container on the host filesystem via Docker volume mounts.</p>
+
+      <h3>First-Time Setup</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="comment"># Create config directory</span>
+<span class="cmd">mkdir -p ~/config</span>
+<span class="cmd">nano ~/config/config.yml</span>
+
+<span class="comment"># Create database file (MUST be a file, not a directory)</span>
+<span class="cmd">touch ~/frigate.db</span>
+
+<span class="comment"># If container already running, copy existing DB first</span>
+<span class="cmd">docker cp frigate-cctv:/config/frigate.db ~/frigate.db</span>
+
+<span class="comment"># Start Frigate</span>
+<span class="cmd">docker compose up -d</span>
+
+<span class="comment"># Verify everything loaded</span>
+<span class="cmd">docker logs frigate-cctv 2>&1 | grep -i "config\|camera\|database"</span></pre>
+      </div>
+
+      <h3>Safe Restart Procedure</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">docker compose down && docker compose up -d</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">If <code>frigate.db</code> doesn't exist as a file, Docker creates it as a directory causing: <em>Are you trying to mount a directory onto a file?</em><br>Fix: <code>rm -rf ~/frigate.db && touch ~/frigate.db</code></div>
+      </div>
+    </section>
+
+    <!-- 6. NVIDIA GPU SETUP -->
+    <section class="section" id="nvidia">
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <h2>NVIDIA GPU Setup</h2>
+      </div>
+      <p>Frigate uses your NVIDIA GPU to decode video streams and run AI object detection. Without GPU acceleration, Frigate uses the CPU which is much slower and cannot handle multiple cameras reliably. Follow these steps in order.</p>
+
+      <h3>Step 1 — Install Driver on Proxmox Host</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — proxmox host</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="comment"># Add NVIDIA CUDA repository</span>
+<span class="cmd">wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb</span>
+<span class="cmd">dpkg -i cuda-keyring_1.1-1_all.deb</span>
+<span class="cmd">apt update && apt install -y dkms cuda-drivers pve-headers-$(uname -r)</span>
+
+<span class="comment"># Blacklist nouveau (open-source driver that conflicts with NVIDIA)</span>
+<span class="cmd">echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf</span>
+<span class="cmd">echo "options nouveau modeset=0" >> /etc/modprobe.d/blacklist-nouveau.conf</span>
+<span class="cmd">update-initramfs -u -k all && reboot</span></pre>
+      </div>
+
+      <h3>Step 2 — LXC GPU Passthrough</h3>
+      <p>Edit <code>/etc/pve/lxc/100.conf</code> on the Proxmox host:</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">/etc/pve/lxc/100.conf</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre>lxc.cgroup2.devices.allow: c 195:* rwm
+lxc.cgroup2.devices.allow: c 236:* rwm
+lxc.cgroup2.devices.allow: c 239:* rwm
+lxc.mount.entry: /dev/nvidia0 dev/nvidia0 none bind,optional,create=file
+lxc.mount.entry: /dev/nvidiactl dev/nvidiactl none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-modeset dev/nvidia-modeset none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-uvm dev/nvidia-uvm none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-uvm-tools dev/nvidia-uvm-tools none bind,optional,create=file</pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span></div>
+        <pre><span class="cmd">pct stop 100 && pct start 100</span></pre>
+      </div>
+
+      <h3>Step 3 — Install Driver Inside LXC</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — inside lxc ct-100</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">wget https://us.download.nvidia.com/XFree86/Linux-x86_64/580.142/NVIDIA-Linux-x86_64-580.142.run</span>
+<span class="cmd">chmod +x NVIDIA-Linux-x86_64-580.142.run</span>
+<span class="cmd">./NVIDIA-Linux-x86_64-580.142.run --no-kernel-module</span>  <span class="comment"># host handles kernel module</span></pre>
+      </div>
+
+      <h3>Step 4 — NVIDIA Container Toolkit</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — inside lxc ct-100</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg</span>
+
+<span class="cmd">curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  tee /etc/apt/sources.list.d/nvidia-container-toolkit.list</span>
+
+<span class="cmd">apt update && apt install -y nvidia-container-toolkit</span>
+<span class="cmd">nvidia-ctk runtime configure --runtime=docker --set-as-default</span>
+<span class="cmd">systemctl restart docker</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">The driver version inside the LXC <strong>must match</strong> the host driver version exactly. Both must be 580.142.</div>
+      </div>
+    </section>
+
+    <!-- 7. ONNX -->
+    <section class="section" id="onnx">
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <h2>GPU Object Detector (ONNX)</h2>
+      </div>
+      <p>TensorRT is no longer supported on amd64. The ONNX detector with the <code>stable-tensorrt</code> Frigate image is used instead. NVIDIA GPUs are automatically detected when configured correctly.</p>
+
+      <h3>Build YOLOv9 ONNX Model</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">docker build . --build-arg MODEL_SIZE=t --build-arg IMG_SIZE=320 \
+  --output /root/config/model_cache -f- &lt;&lt;'EOF'</span>
+FROM python:3.11 AS build
+RUN apt-get update && apt-get install --no-install-recommends -y cmake libgl1 \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /bin/
+WORKDIR /yolov9
+RUN git clone https://github.com/WongKinYiu/yolov9.git .
+RUN uv pip install --system -r requirements.txt
+RUN uv pip install --system onnx==1.18.0 onnxruntime onnx-simplifier==0.4.* onnxscript
+RUN uv pip install --system torch==2.5.1 torchvision \
+  --index-url https://download.pytorch.org/whl/cpu
+ARG MODEL_SIZE
+ARG IMG_SIZE
+ADD https://github.com/WongKinYiu/yolov9/releases/download/v0.1/yolov9-${MODEL_SIZE}-converted.pt \
+  yolov9-${MODEL_SIZE}.pt
+RUN sed -i "s/map_location='cpu'/map_location='cpu', weights_only=False/g" models/experimental.py
+RUN python3 export.py --weights ./yolov9-${MODEL_SIZE}.pt --imgsz ${IMG_SIZE} --simplify --include onnx
+FROM scratch
+COPY --from=build /yolov9/yolov9-${MODEL_SIZE}.onnx /yolov9-${MODEL_SIZE}-${IMG_SIZE}.onnx
+EOF</pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text"><code>torch==2.5.1</code> is pinned to avoid the <code>weights_only=True</code> breaking change in PyTorch 2.6. Do not upgrade without testing.</div>
+      </div>
+
+      <h3>Model Size Reference</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Size</th><th>Flag</th><th>Speed</th><th>Accuracy</th><th>Recommended For</th></tr></thead>
+          <tbody>
+            <tr><td>Tiny</td><td><code>MODEL_SIZE=t</code></td><td>Fastest</td><td>Good</td><td><span class="hl-green">GTX 1050 Ti ✓</span></td></tr>
+            <tr><td>Small</td><td><code>MODEL_SIZE=s</code></td><td>Fast</td><td>Better</td><td>GTX 1060+</td></tr>
+            <tr><td>Medium</td><td><code>MODEL_SIZE=m</code></td><td>Medium</td><td>High</td><td>RTX cards</td></tr>
+            <tr><td>Large</td><td><code>MODEL_SIZE=c</code></td><td>Slow</td><td>Very High</td><td>RTX cards</td></tr>
+            <tr><td>XL</td><td><code>MODEL_SIZE=e</code></td><td>Slowest</td><td>Best</td><td>RTX cards</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. DRIVER MAINTENANCE -->
+    <section class="section" id="maintenance">
+      <div class="section-header">
+        <span class="section-num">08</span>
+        <h2>NVIDIA Driver Maintenance</h2>
+      </div>
+      <p>Proxmox automatically updates its Linux kernel. When the kernel updates, the NVIDIA driver must be rebuilt — otherwise <code>/dev/nvidia*</code> devices disappear and Frigate stops working.</p>
+
+      <h3>Symptoms of Kernel/Driver Mismatch</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">error</span></div>
+        <pre><span class="hl-red">modprobe: FATAL: Module nvidia not found in directory /lib/modules/X.X.XX-pve
+ls: cannot access '/dev/nvidia*': No such file or directory
+Error response from daemon: not a device node</span></pre>
+      </div>
+
+      <h3>Fix After Kernel Update</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — proxmox host</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="comment"># Install headers for new kernel</span>
+<span class="cmd">apt install -y dkms pve-headers-$(uname -r)</span>
+
+<span class="comment"># Rebuild driver for new kernel</span>
+<span class="cmd">dkms autoinstall -k $(uname -r)</span>
+
+<span class="comment"># If status shows 'built' not 'installed', force it</span>
+<span class="cmd">dkms install nvidia/580.142 -k $(uname -r) --force</span>
+
+<span class="comment"># Verify — must show 'installed' not 'built'</span>
+<span class="cmd">dkms status</span>
+
+<span class="comment"># Load modules and verify devices</span>
+<span class="cmd">modprobe nvidia && modprobe nvidia-uvm && modprobe nvidia_modeset</span>
+<span class="cmd">ls -la /dev/nvidia*</span>
+<span class="cmd">nvidia-smi</span></pre>
+      </div>
+
+      <h3>DKMS Status Reference</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Meaning</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><span class="hl-green">installed</span></td><td>Ready to load</td><td>None</td></tr>
+            <tr><td><span class="hl-yellow">built</span></td><td>Compiled but NOT installed in kernel tree</td><td><code>dkms install nvidia/580.142 -k $(uname -r) --force</code></td></tr>
+            <tr><td><span class="hl-red">not found</span></td><td>Not built for this kernel</td><td><code>dkms autoinstall -k $(uname -r)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Auto-load Modules on Boot</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">echo -e "nvidia\nnvidia-uvm\nnvidia_modeset" > /etc/modules-load.d/nvidia.conf</span>
+<span class="cmd">systemctl restart systemd-modules-load</span>
+
+<span class="comment"># Auto-rebuild on kernel update via APT hook</span>
+<span class="cmd">echo 'DPkg::Post-Invoke {"dkms autoinstall 2>/dev/null || true";};' \
+  > /etc/apt/apt.conf.d/99nvidia-dkms</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">GTX 1050 Ti maximum driver is <strong>580.142</strong> — NVIDIA dropped Pascal (GTX 10 series) support in driver 590+.</div>
+      </div>
+    </section>
+
+    <!-- 9. GPU VERIFICATION -->
+    <section class="section" id="verification">
+      <div class="section-header">
+        <span class="section-num">09</span>
+        <h2>GPU Detection Verification</h2>
+      </div>
+      <p>A common issue is Frigate defaulting to CPU detection even when a GPU is present, causing high CPU usage and slow detection. Use these commands to confirm GPU detection is working.</p>
+
+      <h3>Check ONNX Execution Providers</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">docker exec -it frigate-cctv python3 -c "
+import onnxruntime as ort
+print('Providers:', ort.get_available_providers())
+print('Device:', ort.get_device())
+"</span>
+<span class="comment"># Expected output:</span>
+<span class="str">Providers: ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']</span>
+<span class="str">Device: GPU</span></pre>
+      </div>
+
+      <h3>Monitor GPU Usage</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">watch -n 1 nvidia-smi</span>   <span class="comment"># GPU-Util should spike during detection events</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">If GPU-Util shows 0% and no processes are listed, ONNX is using CPU. Add <code>device: cuda</code> to the detectors config and restart Frigate.</div>
+      </div>
+
+      <h3>Verification Checklist</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Check</th><th>Command</th><th>Expected</th></tr></thead>
+          <tbody>
+            <tr><td>GPU on host</td><td><code>nvidia-smi</code></td><td>Shows GTX 1050 Ti, driver 580.142</td></tr>
+            <tr><td>GPU in LXC</td><td><code>nvidia-smi</code></td><td>Same as host</td></tr>
+            <tr><td>GPU in Docker</td><td><code>docker exec -it frigate-cctv nvidia-smi</code></td><td>Shows GTX 1050 Ti</td></tr>
+            <tr><td>CUDA available</td><td>python3 onnxruntime check</td><td>CUDAExecutionProvider in list</td></tr>
+            <tr><td>GPU in use</td><td><code>watch -n 1 nvidia-smi</code></td><td>GPU-Util &gt; 0% during detection</td></tr>
+            <tr><td>DKMS installed</td><td><code>dkms status</code></td><td>nvidia/580.142, kernel: installed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 10. SHM -->
+    <section class="section" id="shm">
+      <div class="section-header">
+        <span class="section-num">10</span>
+        <h2>Shared Memory (SHM) Configuration</h2>
+      </div>
+      <p>Shared memory is a fast memory space Frigate uses to pass video frames between processes. Think of it as a buffer — the more cameras you have, the bigger the buffer needs to be.</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">error</span></div>
+        <pre><span class="hl-yellow">The current SHM size of 64.0MB is too small, recommend increasing it to at least 178MB.</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">yaml — docker-compose.yml</span></div>
+        <pre><span class="key">shm_size:</span> <span class="str">"1024mb"</span>     <span class="comment"># 1GB for 2x 1080p cameras</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — verify</span></div>
+        <pre><span class="cmd">docker compose down && docker compose up -d</span>
+<span class="cmd">docker logs frigate-cctv 2>&1 | grep -i "shm\|memory"</span></pre>
+      </div>
+    </section>
+
+    <!-- 11. ADDING CAMERAS -->
+    <section class="section" id="cameras">
+      <div class="section-header">
+        <span class="section-num">11</span>
+        <h2>Adding Additional Cameras</h2>
+      </div>
+      <p>Each camera needs two RTSP streams: a main high-quality stream for recording and a substream for detection. Both go through go2rtc before reaching Frigate.</p>
+
+      <h3>Steps to Add a Camera</h3>
+      <ul class="steps">
+        <li><span class="step-num">1</span><div class="step-content"><strong>Check RTSP paths</strong>Log into the camera's admin page and find the main and sub stream RTSP URLs.</div></li>
+        <li><span class="step-num">2</span><div class="step-content"><strong>Add to go2rtc streams</strong>Register both streams in the go2rtc section. Handle audio with <code>#audio=aac</code> or <code>#audio=disable</code>.</div></li>
+        <li><span class="step-num">3</span><div class="step-content"><strong>Add camera block</strong>Add the camera under cameras in config.yml. Start with <code>fps: 5</code> for detect.</div></li>
+        <li><span class="step-num">4</span><div class="step-content"><strong>Increase resources</strong>Increase <code>shm_size</code> and <code>tmpfs</code> size for each additional camera.</div></li>
+        <li><span class="step-num">5</span><div class="step-content"><strong>Restart and verify</strong>Restart Frigate and check go2rtc streams: <code>wget -q -O- http://localhost:1984/api/streams</code></div></li>
+      </ul>
+
+      <h3>Audio Handling Per Camera</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Camera</th><th>Audio</th><th>go2rtc Flag</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>entrance (main)</td><td>No audio</td><td>No flag</td><td>No audio stream</td></tr>
+            <tr><td>entrance (sub)</td><td>No audio</td><td>No flag</td><td>Detect, no audio</td></tr>
+            <tr><td>perimeter_1 (main)</td><td>PCMU/8000</td><td><code>#video=copy#audio=aac</code></td><td>Transcodes for MP4 muxing</td></tr>
+            <tr><td>perimeter_1 (sub)</td><td>PCMU/8000</td><td><code>#video=copy#audio=disable</code></td><td>Detect needs no audio</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Common Camera Errors</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Error</th><th>Cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>404 on rtsp://127.0.0.1:8554/...</td><td>Stream name mismatch</td><td>Match go2rtc names exactly with input paths</td></tr>
+            <tr><td>No new valid segments</td><td>PCMU audio incompatible</td><td>Add <code>#video=copy#audio=aac</code></td></tr>
+            <tr><td>Too many unprocessed segments</td><td>Detect fps too high</td><td>Lower <code>fps</code> to <code>5</code></td></tr>
+            <tr><td>ffmpeg not running</td><td>go2rtc not ready</td><td>Verify <code>rtsp: listen: ":8554"</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 12. TROUBLESHOOTING -->
+    <section class="section" id="troubleshooting">
+      <div class="section-header">
+        <span class="section-num">12</span>
+        <h2>Troubleshooting</h2>
+      </div>
+      <p>All errors encountered during this setup with their causes and fixes. Check Frigate logs first: <code>docker logs frigate-cctv 2>&1 | grep -v "GET\|POST\|HTTP" | tail -50</code></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Error</th><th>Cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>Settings reset on restart</td><td>config.yml not in ./config/</td><td><code>mkdir -p ~/config</code> and place config.yml inside</td></tr>
+            <tr><td>Alerts gone on restart</td><td>frigate.db not mapped as file</td><td><code>touch ~/frigate.db</code> and map in volumes</td></tr>
+            <tr><td>Mount error: not a directory</td><td>frigate.db is a directory</td><td><code>rm -rf ~/frigate.db && touch ~/frigate.db</code></td></tr>
+            <tr><td>detect not running at startup</td><td>detect.enabled not set</td><td>Add <code>detect: enabled: true</code></td></tr>
+            <tr><td>ffmpeg process not running</td><td>go2rtc race condition</td><td>Add <code>rtsp: listen: ":8554"</code></td></tr>
+            <tr><td>Connection refused port 8554</td><td>Wrong listen syntax</td><td>Use <code>":8554"</code> — colon required</td></tr>
+            <tr><td>404 on rtsp://127.0.0.1:8554</td><td>Stream name mismatch</td><td>Match go2rtc names exactly</td></tr>
+            <tr><td>No new valid segments</td><td>PCMU audio incompatible</td><td>Add <code>#video=copy#audio=aac</code></td></tr>
+            <tr><td>Too many unprocessed segments</td><td>Detect fps too high</td><td>Lower fps to 5</td></tr>
+            <tr><td>CUDA_ERROR_UNKNOWN</td><td>GPU not passed through LXC</td><td>Add lxc.mount.entry lines to 100.conf</td></tr>
+            <tr><td>No /dev/nvidia* after reboot</td><td>Modules not loaded</td><td><code>modprobe nvidia</code> or configure auto-load</td></tr>
+            <tr><td>DKMS built not installed</td><td>Not installed in kernel tree</td><td><code>dkms install nvidia/580.142 -k $(uname -r) --force</code></td></tr>
+            <tr><td>GPU at 0% / no processes</td><td>ONNX using CPU</td><td>Add <code>device: cuda</code> to detectors</td></tr>
+            <tr><td>SHM too small</td><td>Not enough shared memory</td><td>Increase <code>shm_size</code> to <code>1024mb</code></td></tr>
+            <tr><td>Wrong timezone on recordings</td><td>No TZ set</td><td>Add <code>TZ=Asia/Manila</code> to environment</td></tr>
+            <tr><td>TensorRT not supported</td><td>Wrong detector type</td><td>Use <code>type: onnx</code> with <code>stable-tensorrt</code></td></tr>
+            <tr><td>UnpicklingError weights_only</td><td>PyTorch 2.6+ breaking change</td><td>Pin <code>torch==2.5.1</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Quick Verification Commands</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">docker exec -it frigate-cctv cat /config/config.yml</span>        <span class="comment"># config loaded?</span>
+<span class="cmd">ls -la ~/frigate.db</span>                                          <span class="comment"># DB persisted?</span>
+<span class="cmd">ls -la /media/records/recordings/</span>                            <span class="comment"># recordings writing?</span>
+<span class="cmd">docker exec -it frigate-cctv nvidia-smi</span>                      <span class="comment"># GPU in container?</span>
+<span class="cmd">docker exec -it frigate-cctv wget -q -O- http://localhost:1984/api/streams</span>
+<span class="cmd">watch -n 1 nvidia-smi</span>                                        <span class="comment"># GPU usage?</span></pre>
+      </div>
+    </section>
+
+    <!-- 13. STORAGE ESTIMATION -->
+    <section class="section" id="storage-est">
+      <div class="section-header">
+        <span class="section-num">13</span>
+        <h2>Storage Estimation</h2>
+      </div>
+      <p>Continuous recording storage depends on your camera's stream bitrate. With 2 cameras, multiply these figures by 2. Use this to decide how many days of footage your 1TB storage can hold.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bitrate</th><th>Per Day</th><th>7 Days</th><th>30 Days</th></tr></thead>
+          <tbody>
+            <tr><td>2 Mbps</td><td>~21 GB</td><td>~150 GB</td><td>~630 GB</td></tr>
+            <tr><td>4 Mbps</td><td>~43 GB</td><td>~300 GB</td><td>~1.25 TB</td></tr>
+            <tr><td>6 Mbps</td><td>~65 GB</td><td>~450 GB</td><td>~1.9 TB</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">💡</span>
+        <div class="callout-text">With 2 cameras on 1TB and 30-day retention, approximately 3 Mbps per camera is sustainable. Adjust <code>continuous: days</code> based on your actual stream bitrate.</div>
+      </div>
+    </section>
+
+    <!-- 14. ZABBIX (OPTIONAL) -->
+    <section class="section" id="zabbix">
+      <div class="section-header">
+        <span class="section-num">14</span>
+        <h2>Zabbix Monitoring <span style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace;font-weight:400;margin-left:8px;">(optional)</span></h2>
+      </div>
+      <div class="callout info">
+        <span class="callout-icon">💡</span>
+        <div class="callout-text"><strong class="inline">Optional:</strong> This section documents my personal test of integrating Zabbix monitoring with the Frigate LXC. It is not required for Frigate to work — I tested it out of curiosity to see how well it monitors the container. Feel free to skip this section entirely.</div>
+      </div>
+      <p>I ran a Zabbix server on a separate LXC (CT-102) and installed the Zabbix agent on the Frigate LXC (CT-100) to monitor CPU, memory, and disk usage. Below are the steps and issues I encountered.</p>
+
+      <h3>Network Overview</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Container</th><th>CT ID</th><th>Role</th><th>IP</th></tr></thead>
+          <tbody>
+            <tr><td>frigate-cctv</td><td>CT-100</td><td>Zabbix Agent</td><td>192.168.0.242</td></tr>
+            <tr><td>zabbix</td><td>CT-102</td><td>Zabbix Server</td><td>192.168.0.XXX</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Install & Configure on CT-100</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — inside ct-100</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">wget https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian12_all.deb</span>
+<span class="cmd">dpkg -i zabbix-release_latest_7.0+debian12_all.deb</span>
+<span class="cmd">apt update && apt install -y zabbix-agent</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">/etc/zabbix/zabbix_agentd.conf</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre>Server=192.168.0.XXX,127.0.0.1    <span class="comment"># CT-102 IP — whitelist for agent queries</span>
+ServerActive=192.168.0.XXX         <span class="comment"># CT-102 IP</span>
+Hostname=frigate-cctv              <span class="comment"># must match Zabbix UI hostname exactly</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span></div>
+        <pre><span class="cmd">systemctl enable zabbix-agent && systemctl start zabbix-agent</span>
+<span class="cmd">ss -tlnp | grep 10050</span>   <span class="comment"># verify listening on port 10050</span></pre>
+      </div>
+
+      <h3>Zabbix UI Host Settings</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Host name</td><td>frigate-cctv</td></tr>
+            <tr><td>Visible name</td><td>Frigate CCTV (CT-100)</td></tr>
+            <tr><td>Templates</td><td>Linux by Zabbix agent</td></tr>
+            <tr><td>Interface Type</td><td>Agent</td></tr>
+            <tr><td>IP address</td><td>192.168.0.242</td></tr>
+            <tr><td>Port</td><td>10050</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Zabbix Troubleshooting</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Error</th><th>Cause</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>ZBX_NOTSUPPORTED: empty response</td><td>CT-102 IP not in Server= whitelist</td><td>Add CT-102 IP to Server= and restart agent</td></tr>
+            <tr><td>Connection refused</td><td>Agent not running</td><td><code>systemctl start zabbix-agent</code></td></tr>
+            <tr><td>Host shows red in UI</td><td>Hostname mismatch</td><td>Hostname= must exactly match UI Host name</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 15. TIMEZONE -->
+    <section class="section" id="timezone">
+      <div class="section-header">
+        <span class="section-num">15</span>
+        <h2>Timezone Configuration</h2>
+      </div>
+      <p>By default, Docker containers run in UTC. All recording timestamps, detection alerts, and review events will show the wrong time unless you configure the timezone. For the Philippines, set <code>Asia/Manila</code> (UTC+8).</p>
+
+      <h3>Fix 1 — Environment Variable (Recommended)</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">yaml — docker-compose.yml</span></div>
+        <pre><span class="key">environment:</span>
+  <span class="flag">- TZ=Asia/Manila</span></pre>
+      </div>
+
+      <h3>Fix 2 — Mount Host Timezone Files</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">yaml — docker-compose.yml</span></div>
+        <pre><span class="key">volumes:</span>
+  <span class="flag">- /etc/localtime:/etc/localtime:ro</span>
+  <span class="flag">- /etc/timezone:/etc/timezone:ro</span></pre>
+      </div>
+
+      <h3>Set Timezone on Proxmox Host</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span></div>
+        <pre><span class="cmd">timedatectl set-timezone Asia/Manila</span>
+<span class="cmd">docker compose down && docker compose up -d</span>
+<span class="cmd">docker exec -it frigate-cctv date</span>   <span class="comment"># should show UTC+8</span></pre>
+      </div>
+    </section>
+
+    <!-- 16. BACKUP -->
+    <section class="section" id="backup">
+      <div class="section-header">
+        <span class="section-num">16</span>
+        <h2>Backup Procedures</h2>
+      </div>
+      <p>Regular backups protect against accidental deletion, corruption, and hardware failure. The most critical files are <code>config.yml</code> and <code>frigate.db</code>.</p>
+
+      <h3>What to Back Up</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Location</th><th>Priority</th><th>Frequency</th></tr></thead>
+          <tbody>
+            <tr><td>config.yml</td><td>~/config/config.yml</td><td><span class="hl-red">Critical</span></td><td>Every change</td></tr>
+            <tr><td>docker-compose.yml</td><td>~/docker-compose.yml</td><td><span class="hl-red">Critical</span></td><td>Every change</td></tr>
+            <tr><td>frigate.db</td><td>~/frigate.db</td><td><span class="hl-yellow">High</span></td><td>Daily</td></tr>
+            <tr><td>Recordings</td><td>/media/records/recordings/</td><td><span class="hl-blue">Medium</span></td><td>Continuous</td></tr>
+            <tr><td>LXC Config</td><td>/etc/pve/lxc/100.conf</td><td><span class="hl-red">Critical</span></td><td>Every change</td></tr>
+            <tr><td>Zabbix Config</td><td>/etc/zabbix/zabbix_agentd.conf</td><td><span class="hl-blue">Medium</span></td><td>Every change</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Automated Daily Backup Script</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — ~/backup_frigate.sh</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="str">#!/bin/bash</span>
+<span class="key">BACKUP_DIR=</span><span class="str">~/backups/$(date +%Y%m%d)</span>
+<span class="cmd">mkdir -p $BACKUP_DIR</span>
+<span class="cmd">cp ~/config/config.yml $BACKUP_DIR/</span>
+<span class="cmd">cp ~/docker-compose.yml $BACKUP_DIR/</span>
+<span class="cmd">docker compose stop</span>
+<span class="cmd">cp ~/frigate.db $BACKUP_DIR/frigate_$(date +%Y%m%d).db</span>
+<span class="cmd">docker compose start</span>
+<span class="cmd">find ~/backups -type d -mtime +7 -exec rm -rf {} +</span>
+<span class="cmd">echo "Backup completed: $BACKUP_DIR"</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash — schedule with cron</span></div>
+        <pre><span class="cmd">chmod +x ~/backup_frigate.sh</span>
+<span class="cmd">crontab -e</span>
+<span class="comment"># Add this line:</span>
+<span class="str">0 2 * * * /root/backup_frigate.sh >> /var/log/frigate_backup.log 2>&1</span></pre>
+      </div>
+
+      <h3>Restore from Backup</h3>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+        <pre><span class="cmd">cp ~/backups/20260501/config.yml ~/config/config.yml</span>
+<span class="cmd">docker compose stop</span>
+<span class="cmd">cp ~/backups/20260501/frigate_20260501.db ~/frigate.db</span>
+<span class="cmd">docker compose start</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-text">Always use <code>docker compose stop</code> (not <code>down</code>) before restoring the database to avoid corruption.</div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-left">Documentation <span>Version 1.0</span> · June 2026</div>
+      <div class="footer-right">
+        <a class="footer-link" href="https://docs.frigate.video" target="_blank">frigate docs</a>
+        <a class="footer-link" href="https://github.com" target="_blank">github</a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ── Copy button ──────────────────────────────────────────────────────────
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied!';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 1800);
+    });
+  }
+
+  // ── Reading progress bar ─────────────────────────────────────────────────
+  const progress = document.getElementById('progress');
+  window.addEventListener('scroll', () => {
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const scrolled = (window.scrollY / docHeight) * 100;
+    progress.style.width = scrolled + '%';
+  });
+
+  // ── Active nav link on scroll ────────────────────────────────────────────
+  const sections = document.querySelectorAll('.section[id]');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
 </body>
 </html>
