@@ -802,24 +802,24 @@
     <span class="key">environment:</span>
       <span class="flag">- NVIDIA_VISIBLE_DEVICES=all</span>
       <span class="flag">- NVIDIA_DRIVER_CAPABILITIES=all</span>
-      <span class="flag">- TZ=Asia/Manila</span>              <span class="comment"># timezone</span>
+      <span class="flag">- TZ=Asia/Manila</span>
     <span class="key">devices:</span>
       <span class="flag">- /dev/nvidia0:/dev/nvidia0</span>
       <span class="flag">- /dev/nvidiactl:/dev/nvidiactl</span>
       <span class="flag">- /dev/nvidia-uvm:/dev/nvidia-uvm</span>
     <span class="key">volumes:</span>
-      <span class="flag">- ./config:/config</span>                    <span class="comment"># config persistence</span>
-      <span class="flag">- /media/records:/media/frigate</span>        <span class="comment"># 1TB recording storage</span>
-      <span class="flag">- ./frigate.db:/config/frigate.db</span>     <span class="comment"># database persistence</span>
-      <span class="flag">- /etc/localtime:/etc/localtime:ro</span>    <span class="comment"># sync timezone</span>
-      <span class="flag">- /etc/timezone:/etc/timezone:ro</span>      <span class="comment"># sync timezone name</span>
-      <span class="flag">- type: tmpfs</span>
+      <span class="flag">- ./config:/config</span>
+      <span class="flag">- /media/records:/media/frigate</span>
+      <span class="flag">- ./frigate.db:/config/frigate.db</span>
+      <span class="flag">- /etc/localtime:/etc/localtime:ro</span>      <span class="comment"># sync with host time</span>
+      <span class="flag">- /etc/timezone:/etc/timezone:ro</span>        <span class="comment"># sync with host timezone</span>
+      <span class="flag">- type: tmpfs</span> <span class="comment"># 1GB In-memory filesystem for recording segment storage</span>
         <span class="key">target:</span> <span class="str">/tmp/cache</span>
         <span class="key">tmpfs:</span>
-          <span class="key">size:</span> <span class="num">2000000000</span>               <span class="comment"># 2GB in-memory segment cache</span>
+          <span class="key">size:</span> <span class="num">2000000000</span>
     <span class="key">ports:</span>
       <span class="flag">- "8971:5000"</span>
-      <span class="flag">- "8554:8554"</span></pre>
+      <span class="flag">- "8554:8554"</span> <span class="comment"># RTSP feeds</span></pre>
       </div>
 
       <h3>Volume Mapping Summary</h3>
@@ -869,12 +869,10 @@
         <div class="code-header"><span class="code-lang">yaml</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
         <pre><span class="key">mqtt:</span>
   <span class="key">enabled:</span> <span class="str">false</span>
-
 <span class="key">detectors:</span>
   <span class="key">onnx:</span>
-    <span class="key">type:</span> <span class="str">onnx</span>
-    <span class="key">device:</span> <span class="str">cuda</span>        <span class="comment"># force CUDAExecutionProvider for GPU detection</span>
-
+    <span class="key">type:</span> <span class="str">onnx</span>         <span class="comment"># NVIDIA GPU auto-detected in tensorrt image</span>
+    <span class="key">device:</span> <span class="str">cuda</span>
 <span class="key">model:</span>
   <span class="key">model_type:</span> <span class="str">yolo-generic</span>
   <span class="key">width:</span> <span class="num">320</span>
@@ -883,28 +881,31 @@
   <span class="key">input_dtype:</span> <span class="str">float</span>
   <span class="key">path:</span> <span class="str">/config/model_cache/yolov9-t-320.onnx</span>
   <span class="key">labelmap_path:</span> <span class="str">/labelmap/coco-80.txt</span>
-
 <span class="key">ffmpeg:</span>
   <span class="key">hwaccel_args:</span> <span class="str">preset-nvidia-h265</span>
-
 <span class="key">record:</span>
   <span class="key">enabled:</span> <span class="str">true</span>
   <span class="key">continuous:</span>
     <span class="key">days:</span> <span class="num">30</span>
-  <span class="key">alerts:</span>
-    <span class="key">retain:</span>
-      <span class="key">days:</span> <span class="num">30</span>
-      <span class="key">mode:</span> <span class="str">motion</span>
   <span class="key">detections:</span>
+    <span class="key">pre_capture:</span> <span class="num">30</span>        <span class="comment"># seconds before detection to include</span>
+    <span class="key">post_capture:</span> <span class="num">30</span>       <span class="comment"># seconds after detection to include</span>
     <span class="key">retain:</span>
       <span class="key">days:</span> <span class="num">30</span>
       <span class="key">mode:</span> <span class="str">motion</span>
-
+  <span class="key">alerts:</span>
+    <span class="key">pre_capture:</span> <span class="num">10</span>
+    <span class="key">post_capture:</span> <span class="num">10</span>
+    <span class="key">retain:</span>
+      <span class="key">days:</span> <span class="num">30</span>
+      <span class="key">mode:</span> <span class="str">motion</span>
 <span class="key">cameras:</span>
   <span class="key">entrance:</span>
     <span class="key">enabled:</span> <span class="str">true</span>
     <span class="key">ffmpeg:</span>
       <span class="key">input_args:</span> <span class="str">preset-rtsp-restream</span>
+      <span class="key">output_args:</span>
+        <span class="key">record:</span> <span class="str">preset-record-generic-audio-aac</span>
       <span class="key">inputs:</span>
         <span class="flag">- path: rtsp://127.0.0.1:8554/entrance_1</span>
           <span class="key">roles:</span>
@@ -912,22 +913,21 @@
         <span class="flag">- path: rtsp://127.0.0.1:8554/entrance_2</span>
           <span class="key">roles:</span>
             <span class="flag">- detect</span>
-      <span class="key">output_args:</span>
-        <span class="key">record:</span> <span class="str">preset-record-generic-audio-aac</span>
+    <span class="key">snapshots:</span>
+      <span class="key">enabled:</span> <span class="str">true</span>
     <span class="key">detect:</span>
       <span class="key">enabled:</span> <span class="str">true</span>
       <span class="key">width:</span> <span class="num">1920</span>
       <span class="key">height:</span> <span class="num">1080</span>
-      <span class="key">fps:</span> <span class="num">20</span>
+      <span class="key">fps:</span> <span class="num">5</span>
     <span class="key">record:</span>
       <span class="key">enabled:</span> <span class="str">true</span>
       <span class="key">continuous:</span>
-        <span class="key">days:</span> <span class="num">30</span>
+        <span class="key">days:</span> <span class="num">14</span>     <span class="comment"># per-camera override</span>
     <span class="key">live:</span>
       <span class="key">streams:</span>
         <span class="key">Stream 1:</span> <span class="str">entrance_1</span>
         <span class="key">Stream 2:</span> <span class="str">entrance_2</span>
-
   <span class="key">perimeter_1:</span>
     <span class="key">enabled:</span> <span class="str">true</span>
     <span class="key">ffmpeg:</span>
@@ -944,31 +944,32 @@
         <span class="key">record:</span> <span class="str">preset-record-generic-audio-aac</span>
     <span class="key">detect:</span>
       <span class="key">enabled:</span> <span class="str">true</span>
-      <span class="key">width:</span> <span class="num">1920</span>
+      <span class="key">width:</span> <span class="num">1920</span>      <span class="comment"># adjust to your camera resolution</span>
       <span class="key">height:</span> <span class="num">1080</span>
-      <span class="key">fps:</span> <span class="num">5</span>                  <span class="comment"># start low for new cameras</span>
+      <span class="key">fps:</span> <span class="num">5</span>           <span class="comment"># ← start LOW (5fps) for detect stream</span>
     <span class="key">record:</span>
       <span class="key">enabled:</span> <span class="str">true</span>
       <span class="key">continuous:</span>
-        <span class="key">days:</span> <span class="num">30</span>
+        <span class="key">days:</span> <span class="num">14</span>
     <span class="key">live:</span>
       <span class="key">streams:</span>
         <span class="key">Stream 1:</span> <span class="str">perimeter_1_main</span>
         <span class="key">Stream 2:</span> <span class="str">perimeter_1_sub</span>
-
+    <span class="key">objects:</span>
+      <span class="key">mask:</span> <span class="str">0.46,0,0.994,1,0.994,0</span>
 <span class="key">version:</span> <span class="str">0.17-0</span>
 <span class="key">go2rtc:</span>
   <span class="key">streams:</span>
     <span class="key">entrance_1:</span>
-      <span class="flag">- rtsp://admin:YOUR_PASSWORD@192.168.0.249/media/video1</span>
+      <span class="flag">- rtsp://admin:PASSWORD@[CAMERA-1 IP ADDRESS]/media/video1</span>
     <span class="key">entrance_2:</span>
-      <span class="flag">- rtsp://admin:YOUR_PASSWORD@192.168.0.249/media/video2</span>
+      <span class="flag">- rtsp://admin:PASSWORD@[CAMERA-1 IP ADDRESS]/media/video2</span>
     <span class="key">perimeter_1_main:</span>
-      <span class="flag">- "rtsp://admin:YOUR_PASSWORD@192.168.0.250/media/video1#video=copy#audio=aac"</span>
+      <span class="flag">- "rtsp://admin:PASSWORD@[CAMERA-2 IP ADDRESS]/media/video1#video=copy#audio=aac"</span>  <span class="comment"># ← transcode audio to AAC</span>
     <span class="key">perimeter_1_sub:</span>
-      <span class="flag">- "rtsp://admin:YOUR_PASSWORD@192.168.0.250/media/video2#video=copy#audio=disable"</span>
+      <span class="flag">- "rtsp://admin:PASSWORD@[CAMERA-2 IP ADDRESS]/media/video2#video=copy#audio=disable"</span>  <span class="comment"># ← disable audio on detect</span>
   <span class="key">rtsp:</span>
-    <span class="key">listen:</span> <span class="str">":8554"</span>          <span class="comment"># colon required — prevents ffmpeg race condition</span></pre>
+    <span class="key">listen:</span> <span class="str">":8554"</span></pre>
       </div>
 
       <h3>Key Configuration Notes</h3>
