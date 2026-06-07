@@ -93,7 +93,7 @@ frigate-cctv-proxmox/
 
 - **`frigate.db` must be a file** — `touch ~/frigate.db` before first start
 - **`rtsp: listen: ":8554"`** — the colon before port is required
-- **Driver 590+ drops GTX 1050 Ti** — do not upgrade beyond 580.142
+- **DOUBLE CHECK the drivers for 1050 Ti** — download the linux version not windows
 - **After Proxmox kernel update** — run `dkms autoinstall` to rebuild NVIDIA driver
 - **ONNX defaults to CPU** — must set `device: cuda` explicitly in detectors config
 - **PCMU audio → recording failure** — add `#video=copy#audio=aac` to go2rtc stream
